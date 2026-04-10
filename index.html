@@ -780,28 +780,37 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+const PAGE_SIZE = 50;
+let currentPage = 1;
+
+function sanitize(d) {
+  return {
+    nama: d.nama||'', nim: d.nim||'', tahun_masuk: d.tahun_masuk||'',
+    tgl_lulus: d.tgl_lulus||'', fakultas: d.fakultas||'', prodi: d.prodi||'',
+    email: d.email||'', hp: d.hp||'', linkedin: d.linkedin||'',
+    instagram: d.instagram||'', facebook: d.facebook||'', tiktok: d.tiktok||'',
+    tempat_kerja: d.tempat_kerja||'', alamat_kerja: d.alamat_kerja||'',
+    posisi: d.posisi||'', status: d.status||'', sosmed_instansi: d.sosmed_instansi||''
+  };
+}
+
 function loadFromFirebase() {
   const tbody = document.getElementById('alumni-tbody');
-  tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">⏳</div><p>Memuat data dari server...</p></div></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">⏳</div><p>Memuat data...</p></div></td></tr>';
   db.ref('alumni').once('value').then(snapshot => {
     const raw = snapshot.val();
     if (!raw) {
-      tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">📂</div><p>Belum ada data di database.</p></div></td></tr>';
+      tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">📂</div><p>Belum ada data.</p></div></td></tr>';
       return;
     }
-    allData = Object.values(raw).map(d => ({
-      nama: d.nama||'', nim: d.nim||'', tahun_masuk: d.tahun_masuk||'',
-      tgl_lulus: d.tgl_lulus||'', fakultas: d.fakultas||'', prodi: d.prodi||'',
-      email: d.email||'', hp: d.hp||'', linkedin: d.linkedin||'',
-      instagram: d.instagram||'', facebook: d.facebook||'', tiktok: d.tiktok||'',
-      tempat_kerja: d.tempat_kerja||'', alamat_kerja: d.alamat_kerja||'',
-      posisi: d.posisi||'', status: d.status||'', sosmed_instansi: d.sosmed_instansi||''
-    }));
+    allData = Object.values(raw).map(sanitize);
     filteredData = [...allData];
+    currentPage = 1;
     updateStats();
     renderTable();
+    renderPagination();
   }).catch(err => {
-    tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">❌</div><p>Gagal memuat data: ' + err.message + '</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17"><div class="empty-state"><div class="icon">❌</div><p>Gagal memuat: ' + err.message + '</p></div></td></tr>';
   });
 }
 
@@ -1012,18 +1021,57 @@ function filterData() {
     const matchSt = !st || (d.status||'').toLowerCase().includes(st);
     return matchQ && matchSt;
   });
+  currentPage = 1;
   renderTable();
+  renderPagination();
 }
 
 // ========= RENDER =========
+function renderPagination() {
+  let el = document.getElementById('pagination');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pagination';
+    el.style = 'display:flex;gap:8px;align-items:center;justify-content:center;padding:16px;flex-wrap:wrap;';
+    document.querySelector('.table-card').appendChild(el);
+  }
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  let btns = '';
+  btns += `<button onclick="goPage(1)" style="padding:6px 12px;border:1.5px solid #d1dce8;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">«</button>`;
+  btns += `<button onclick="goPage(${currentPage-1})" style="padding:6px 12px;border:1.5px solid #d1dce8;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">‹</button>`;
+  const start = Math.max(1, currentPage - 2);
+  const end = Math.min(totalPages, currentPage + 2);
+  for (let p = start; p <= end; p++) {
+    const active = p === currentPage;
+    btns += `<button onclick="goPage(${p})" style="padding:6px 12px;border:1.5px solid ${active?'#1a3a5c':'#d1dce8'};border-radius:7px;background:${active?'#1a3a5c':'#fff'};color:${active?'#fff':'#1a2535'};cursor:pointer;font-size:13px;font-weight:${active?'700':'400'};">${p}</button>`;
+  }
+  btns += `<button onclick="goPage(${currentPage+1})" style="padding:6px 12px;border:1.5px solid #d1dce8;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">›</button>`;
+  btns += `<button onclick="goPage(${totalPages})" style="padding:6px 12px;border:1.5px solid #d1dce8;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;">»</button>`;
+  btns += `<span style="font-size:13px;color:#64748b;">Hal ${currentPage} / ${totalPages} (${filteredData.length.toLocaleString()} data)</span>`;
+  el.innerHTML = btns;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderTable();
+  renderPagination();
+  document.querySelector('.table-wrap').scrollTop = 0;
+}
+
 function renderTable() {
   const tbody = document.getElementById('alumni-tbody');
-  document.getElementById('table-count').textContent = filteredData.length + ' data';
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const pageData = filteredData.slice(start, start + PAGE_SIZE);
+  document.getElementById('table-count').textContent = filteredData.length.toLocaleString() + ' data';
   if (filteredData.length === 0) {
     tbody.innerHTML = `<tr><td colspan="17"><div class="empty-state"><div class="icon">🔍</div><p>Tidak ada data yang cocok.</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = filteredData.map((d, i) => {
+  tbody.innerHTML = pageData.map((d, i) => {
+    const idx = start + i;
     const st = (d.status||'').toLowerCase();
     let badgeClass = 'badge-other', badgeText = d.status || '-';
     if (st.includes('pns')) { badgeClass = 'badge-pns'; badgeText = 'PNS'; }
@@ -1035,7 +1083,7 @@ function renderTable() {
       return `<a class="social-link" href="${href}" target="_blank" rel="noopener">${label}</a>`;
     }
     return `<tr>
-      <td>${i+1}</td>
+      <td>${idx+1}</td>
       <td title="${d.nama}"><strong>${d.nama || '-'}</strong></td>
       <td>${d.nim || '-'}</td>
       <td>${d.fakultas || '-'}</td>

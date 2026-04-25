@@ -148,8 +148,8 @@ body{font-family:'Bricolage Grotesque',sans-serif;background:var(--bg);color:var
 .content{padding:28px;flex:1;}
 
 /* VIEWS */
-.view{display:none;}
-.view.on{display:block;animation:fUp .22s var(--ease);}
+.view{display:none !important;}
+.view.on{display:block !important;animation:fUp .22s var(--ease);}
 @keyframes fUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* NOTICE */
@@ -572,7 +572,7 @@ tbody td{padding:12px 15px;vertical-align:middle;white-space:nowrap;}
 <!-- ════════════════════════════
      ALUMNI APP
 ════════════════════════════ -->
-<div id="pg-alumni">
+<div id="pg-alumni" style="display:none;">
   <div class="app-wrap">
     <aside class="sidebar">
       <div class="sb-logo">
@@ -929,8 +929,11 @@ function doLoginAlumni() {
     document.getElementById('alumni-ava').textContent = init;
     document.getElementById('alumni-uname').textContent = found.data.nama;
     showPage('pg-alumni');
-    renderAlumniProfile(currentUser.data);
-    fillAlumniEditForm(currentUser.data);
+    // small delay to ensure DOM is visible before rendering
+    setTimeout(() => {
+      showAlumniView('profil');
+      fillAlumniEditForm(currentUser.data);
+    }, 50);
   }).catch(err => {
     btnEl.textContent = 'Masuk sebagai Alumni →'; btnEl.disabled = false;
     document.getElementById('err-alumni').textContent = 'Terjadi kesalahan: ' + err.message;
@@ -947,7 +950,10 @@ function doLogout() {
 }
 
 function showPage(id) {
-  ['pg-login','pg-admin','pg-alumni'].forEach(p => document.getElementById(p).style.display = p===id ? '' : 'none');
+  ['pg-login','pg-admin','pg-alumni'].forEach(p => {
+    const el = document.getElementById(p);
+    el.style.display = p===id ? (p==='pg-login'?'flex':'block') : 'none';
+  });
 }
 
 // ══════════════════════════════════════
@@ -1387,9 +1393,13 @@ document.getElementById('ov-del').addEventListener('click',function(e){if(e.targ
 // ALUMNI SELF-VIEW
 // ══════════════════════════════════════
 function showAlumniView(name) {
-  document.querySelectorAll('#pg-alumni .view').forEach(v=>v.classList.remove('on'));
+  ['al-view-profil','al-view-edit'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('on');
+  });
   document.querySelectorAll('#pg-alumni .sb-item').forEach(b=>b.classList.remove('on'));
-  document.getElementById('al-view-'+name).classList.add('on');
+  const target = document.getElementById('al-view-'+name);
+  if(target) target.classList.add('on');
   const nb=document.getElementById('al-nav-'+name);
   if(nb)nb.classList.add('on');
   const t={profil:'Profil Saya',edit:'Edit Data Saya'};
